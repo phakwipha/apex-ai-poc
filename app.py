@@ -34,7 +34,7 @@ def run_nl2sql(user_query):
 
     # ใช้ client.models.generate_content พร้อมโมเดลมาตรฐานใหม่
     response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=prompt
+        model="gemini-3.8-flash", contents=prompt
     )
     sql_query = response.text.strip().replace("```sql", "").replace("```", "")
 
