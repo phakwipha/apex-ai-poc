@@ -37,7 +37,7 @@ def run_nl2sql(user_query):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-pro", contents=prompt
+                model="gemini-3.1-pro-preview", contents=prompt
             )
             sql_query = (
                 response.text.strip().replace("```sql", "").replace("```", "")
