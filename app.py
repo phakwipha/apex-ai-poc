@@ -1,9 +1,9 @@
+import time
 import sqlite3
 from google import genai
 import pandas as pd
 import streamlit as st
 
-# ดึง API Key ผ่าน Client ใหม่ของ SDK ปัจจุบัน
 if "GEMINI_API_KEY" in st.secrets:
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 else:
@@ -32,17 +32,28 @@ def run_nl2sql(user_query):
     User Question: {user_query}
     """
 
-    # ใช้ client.models.generate_content พร้อมโมเดลมาตรฐานใหม่
-    response = client.models.generate_content(
-        model="gemini-3.8-flash", contents=prompt
-    )
-    sql_query = response.text.strip().replace("```sql", "").replace("```", "")
+    # เพิ่มระบบพยายามส่งซ้ำอัตโนมัติ (Retry) เมื่อเจอเซิร์ฟเวอร์หนาแน่น (503)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.8-flash", contents=prompt
+            )
+            sql_query = (
+                response.text.strip().replace("```sql", "").replace("```", "")
+            )
 
-    conn = sqlite3.connect("enterprise_poc.db")
-    df_result = pd.read_sql_query(sql_query, conn)
-    conn.close()
+            conn = sqlite3.connect("enterprise_poc.db")
+            df_result = pd.read_sql_query(sql_query, conn)
+            conn.close()
 
-    return sql_query, df_result
+            return sql_query, df_result
+        except Exception as e:
+            if "503" in str(e) and attempt < max_retries - 1:
+                time.sleep(2)  # รอ 2 วินาทีก่อนลองใหม่
+                continue
+            else:
+                raise e
 
 
 # ---- Dashboard UI ----
