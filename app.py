@@ -1,48 +1,34 @@
 import sqlite3
-from google import genai
+import google.generativeai as genai
 import pandas as pd
 import streamlit as st
 
-# ดึง API Key จาก Secrets บน Streamlit Cloud ผ่าน Client ใหม่
+# ตั้งค่า API Key
 if "GEMINI_API_KEY" in st.secrets:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-else:
-    st.error("กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets")
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 
 def run_nl2sql(user_query):
     schema_info = """
     Table Name: financial_summary
     Columns:
-    - Period (TEXT): e.g. '2026-08', '2026-09'
-    - BU_Name (TEXT): e.g. 'Core Banking', 'Digital Payment'
+    - Period (TEXT)
+    - BU_Name (TEXT)
     - Revenue_Actual (REAL)
     - Revenue_Budget (REAL)
-    - Revenue_Variance_Amount (REAL)
-    - Revenue_Variance_Pct (REAL)
-    - OpEx_Actual (REAL)
-    - OpEx_Budget (REAL)
-    - OpEx_Variance_Amount (REAL)
-    - OpEx_Variance_Pct (REAL)
     - Operating_Profit (REAL)
-    - Operating_Profit_Margin_Pct (REAL)
     """
 
     prompt = f"""
-    You are an expert SQLite Data Analyst. 
-    Based on the DB Schema below, generate ONLY a valid SQLite query to answer the user's question.
-    Do not include markdown syntax like ```sql or explanation. Output raw SQL query string only.
-    
-    Schema:
+    Generate only a valid SQLite query for the question based on this schema:
     {schema_info}
-    
-    User Question: {user_query}
+    Question: {user_query}
+    Output only the raw SQL string without markdown.
     """
 
-    # ใช้ Client และโมเดลมาตรฐานเวอร์ชันใหม่ล่าสุด
-    response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=prompt
-    )
+    # ใช้โมเดลพื้นฐานที่เสถียรที่สุด
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(prompt)
     sql_query = response.text.strip().replace("```sql", "").replace("```", "")
 
     conn = sqlite3.connect("enterprise_poc.db")
@@ -52,26 +38,16 @@ def run_nl2sql(user_query):
     return sql_query, df_result
 
 
-# ---- Dashboard UI พื้นเดิม ----
 st.title("📊 Executive P&L & Financial Intelligence Dashboard")
-st.write("ยินดีต้อนรับสู่ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ")
 
-# ---- Chatbot UI ----
-st.subheader("🤖 สอบถามข้อมูลทางการเงินด้วย AI (NL2SQL)")
-
-user_input = st.chat_input(
-    "พิมพ์คำถามเชิงธุรกิจ (เช่น 'ขอผลกำไรของ Core Banking เดือน 2026-08')"
-)
+user_input = st.chat_input("พิมพ์คำถามเชิงธุรกิจที่นี่...")
 
 if user_input:
     st.chat_message("user").write(user_input)
     with st.chat_message("assistant"):
         try:
             sql, result_df = run_nl2sql(user_input)
-            st.markdown(f"**Generated SQL:** `{sql}`")
-            if not result_df.empty:
-                st.dataframe(result_df)
-            else:
-                st.write("ไม่พบข้อมูลตามเงื่อนไขที่ระบุ")
+            st.code(sql, language="sql")
+            st.dataframe(result_df)
         except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+            st.error(f"เกิดข้อผิดพลาด: {e}")
