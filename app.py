@@ -26,8 +26,8 @@ def run_nl2sql(user_query):
     Output only the raw SQL string without markdown.
     """
 
-    # ใช้โมเดลพื้นฐานที่เสถียรที่สุด
-    model = genai.GenerativeModel("gemini-1.5-flash")
+   
+    model = genai.GenerativeModel("gemini-3.5-flash")
     response = model.generate_content(prompt)
     sql_query = response.text.strip().replace("```sql", "").replace("```", "")
 
