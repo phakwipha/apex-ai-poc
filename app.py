@@ -1,11 +1,11 @@
 import sqlite3
-import google.generativeai as genai
+from google import genai
 import pandas as pd
 import streamlit as st
 
-# ดึง API Key จาก Secrets บน Streamlit Cloud
+# ดึง API Key จาก Secrets บน Streamlit Cloud ผ่าน Client ใหม่
 if "GEMINI_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 else:
     st.error("กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets")
 
@@ -39,8 +39,10 @@ def run_nl2sql(user_query):
     User Question: {user_query}
     """
 
-    model = genai.GenerativeModel("gemini-3.5-flash")
-    response = model.generate_content(prompt)
+    # ใช้ Client และโมเดลมาตรฐานเวอร์ชันใหม่ล่าสุด
+    response = client.models.generate_content(
+        model="gemini-2.5-flash", contents=prompt
+    )
     sql_query = response.text.strip().replace("```sql", "").replace("```", "")
 
     conn = sqlite3.connect("enterprise_poc.db")
@@ -54,7 +56,7 @@ def run_nl2sql(user_query):
 st.title("📊 Executive P&L & Financial Intelligence Dashboard")
 st.write("ยินดีต้อนรับสู่ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ")
 
-# ---- Chatbot UI (ส่วนใหม่) ----
+# ---- Chatbot UI ----
 st.subheader("🤖 สอบถามข้อมูลทางการเงินด้วย AI (NL2SQL)")
 
 user_input = st.chat_input(
