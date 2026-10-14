@@ -39,7 +39,7 @@ def run_nl2sql(user_query):
     User Question: {user_query}
     """
 
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    model = genai.GenerativeModel('gemini-pro')
     response = model.generate_content(prompt)
     sql_query = response.text.strip().replace("```sql", "").replace("```", "")
 
