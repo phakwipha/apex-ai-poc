@@ -1,6 +1,5 @@
-import json
 import pandas as pd
-import requests
+import google.generativeai as genai
 import sqlite3
 import streamlit as st
 
@@ -13,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude API)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Google Gemini)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -59,12 +58,12 @@ except Exception as e:
   st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูล: {e}")
   st.stop()
 
-# ตรวจสอบการตั้งค่า API Key
-if "ANTHROPIC_API_KEY" not in st.secrets:
-  st.error("❌ กรุณาตั้งค่า ANTHROPIC_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
+# ตรวจสอบการตั้งค่า API Key (ใช้ GEMINI_API_KEY ใน Streamlit Secrets)
+if "GEMINI_API_KEY" not in st.secrets:
+  st.error("❌ กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
   st.stop()
 
-api_key = st.secrets["ANTHROPIC_API_KEY"]
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ส่วนเลือกคำถามวิเคราะห์
 question = st.selectbox(
@@ -88,35 +87,13 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
         """
 
-    # ใช้โมเดล Sonnet มาตรฐานที่รองรับทุกบัญชี API ทั่วไป
-    headers = {
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-
-    payload = {
-        "model": "claude-3-5-sonnet-latest",
-        "max_tokens": 400,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-
     try:
-      res = requests.post(
-          "https://api.anthropic.com/v1/messages",
-          headers=headers,
-          data=json.dumps(payload),
-      )
-
-      if res.status_code == 200:
-        res_json = res.json()
-        ai_reply = res_json["content"][0]["text"]
-        st.markdown("### 🤖 ผลการวิเคราะห์")
-        st.info(ai_reply)
-      else:
-        st.error(f"API Error ({res.status_code}): {res.text}")
+      model = genai.GenerativeModel("gemini-1.5-flash")
+      response = model.generate_content(prompt)
+      st.markdown("### 🤖 ผลการวิเคราะห์")
+      st.info(response.text)
     except Exception as e:
-      st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อ: {e}")
+      st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
 
 # แสดงตารางข้อมูลเบื้องต้น
 with st.expander("📁 ดูข้อมูลดิบทั้งหมดในระบบ (Raw Data)"):
