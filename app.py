@@ -1,5 +1,6 @@
-import anthropic
+import json
 import pandas as pd
+import requests
 import sqlite3
 import streamlit as st
 
@@ -12,20 +13,18 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude 3 Haiku)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude API Direct)</p>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
 
-# เชื่อมต่อ SQLite และสร้างตารางพร้อมข้อมูลตัวอย่างอัตโนมัติหากยังไม่มี
+# เชื่อมต่อ SQLite และสร้างตารางพร้อมข้อมูลตัวอย่างอัตโนมัติ
 @st.cache_data
 def load_data():
   conn = sqlite3.connect("enterprise_poc.db")
   cursor = conn.cursor()
-
-  # 1. สร้างตาราง pnl_data หากยังไม่มีในไฟล์ enterprise_poc.db
   cursor.execute("""
         CREATE TABLE IF NOT EXISTS pnl_data (
             Period TEXT,
@@ -35,8 +34,6 @@ def load_data():
             Operating_Profit REAL
         )
     """)
-
-  # 2. ตรวจสอบว่ามีข้อมูลในตารางไหม หากยังไม่มีให้สร้างข้อมูลตัวอย่างใส่เข้าไป
   cursor.execute("SELECT COUNT(*) FROM pnl_data")
   if cursor.fetchone()[0] == 0:
     sample_data = [
@@ -51,7 +48,6 @@ def load_data():
         "INSERT INTO pnl_data VALUES (?, ?, ?, ?, ?)", sample_data
     )
     conn.commit()
-
   df = pd.read_sql("SELECT * FROM pnl_data", conn)
   conn.close()
   return df
@@ -63,12 +59,12 @@ except Exception as e:
   st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูล: {e}")
   st.stop()
 
-# ตรวจสอบการตั้งค่า Anthropic API Key
+# ตรวจสอบการตั้งค่า API Key
 if "ANTHROPIC_API_KEY" not in st.secrets:
   st.error("❌ กรุณาตั้งค่า ANTHROPIC_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
   st.stop()
 
-client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+api_key = st.secrets["ANTHROPIC_API_KEY"]
 
 # ส่วนเลือกคำถามวิเคราะห์
 question = st.selectbox(
@@ -92,16 +88,37 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
         """
 
+    # ยิงตรงเข้า Anthropic Messages API ด้วย HTTP POST (ไม่ต้องพึ่ง SDK)
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    payload = {
+        "model": "claude-3-5-haiku-20241022",
+        "max_tokens": 400,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+
     try:
-      response = client.messages.create(
-          model="claude-3-haiku-20240307",
-          max_tokens=400,
-          messages=[{"role": "user", "content": prompt}],
+      res = requests.post(
+          "https://api.anthropic.com/v1/messages",
+          headers=headers,
+          data=json.dumps(payload),
       )
-      st.markdown("### 🤖 ผลการวิเคราะห์")
-      st.info(response.content[0].text)
+
+      if res.status_code == 200:
+        res_json = res.json()
+        ai_reply = res_json["content"][0]["text"]
+        st.markdown("### 🤖 ผลการวิเคราะห์")
+        st.info(ai_reply)
+      else:
+        st.error(
+            f"API Error ({res.status_code}): {res.text}"
+        )  # จะปริ้นท์ Error ดิบที่แท้จริงออกมาให้เห็นชัดๆ
     except Exception as e:
-      st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+      st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อ: {e}")
 
 # แสดงตารางข้อมูลเบื้องต้น
 with st.expander("📁 ดูข้อมูลดิบทั้งหมดในระบบ (Raw Data)"):
