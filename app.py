@@ -34,7 +34,7 @@ def run_nl2sql(user_query):
 
     # ใช้ claude-3-5-haiku-20241022 ซึ่งเป็นโมเดลที่ประหยัดที่สุดและเร็วที่สุด
     response = client.messages.create(
-        model="claude-3-5-haiku-20241022",
+        model="claude-3-5-haiku",
         max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
