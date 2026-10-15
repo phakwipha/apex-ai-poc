@@ -1,13 +1,13 @@
-import time
 import sqlite3
-from google import genai
+import anthropic
 import pandas as pd
 import streamlit as st
 
-if "GEMINI_API_KEY" in st.secrets:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+# ดึง API Key ของ Anthropic
+if "ANTHROPIC_API_KEY" in st.secrets:
+    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 else:
-    st.error("กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets")
+    st.error("กรุณาตั้งค่า ANTHROPIC_API_KEY ใน Streamlit Secrets")
 
 
 def run_nl2sql(user_query):
@@ -32,33 +32,32 @@ def run_nl2sql(user_query):
     User Question: {user_query}
     """
 
-    # เพิ่มระบบพยายามส่งซ้ำอัตโนมัติ (Retry) เมื่อเจอเซิร์ฟเวอร์หนาแน่น (503)
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model="gemini-3.1-pro-preview", contents=prompt
-            )
-            sql_query = (
-                response.text.strip().replace("```sql", "").replace("```", "")
-            )
+    # ใช้ claude-3-5-haiku-20241022 ซึ่งเป็นโมเดลที่ประหยัดที่สุดและเร็วที่สุด
+    response = client.messages.create(
+        model="claude-3-5-haiku-20241022",
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}],
+    )
 
-            conn = sqlite3.connect("enterprise_poc.db")
-            df_result = pd.read_sql_query(sql_query, conn)
-            conn.close()
+    # ดึงผลลัพธ์ที่เป็นข้อความ SQL
+    sql_query = (
+        response.content[0]
+        .text.strip()
+        .replace("```sql", "")
+        .replace("```", "")
+        .strip()
+    )
 
-            return sql_query, df_result
-        except Exception as e:
-            if "503" in str(e) and attempt < max_retries - 1:
-                time.sleep(2)  # รอ 2 วินาทีก่อนลองใหม่
-                continue
-            else:
-                raise e
+    conn = sqlite3.connect("enterprise_poc.db")
+    df_result = pd.read_sql_query(sql_query, conn)
+    conn.close()
+
+    return sql_query, df_result
 
 
 # ---- Dashboard UI ----
 st.title("📊 Executive P&L & Financial Intelligence Dashboard")
-st.write("ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ")
+st.write("ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude 3.5 Haiku)")
 
 user_input = st.chat_input(
     "พิมพ์คำถามเชิงธุรกิจ (เช่น 'ขอผลกำไรของ Core Banking เดือน 2026-08')"
