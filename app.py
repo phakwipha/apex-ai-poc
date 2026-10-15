@@ -83,7 +83,7 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
       import google.generativeai as genai
 
       genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-1.5-flash")
+      model = genai.GenerativeModel("gemini-3.5-flash")
       prompt = f"""
             คุณคือผู้ช่วยผู้บริหารด้านการเงิน วิเคราะห์ข้อมูล P&L ต่อไปนี้เพื่อตอบคำถาม: "{question}"
             ข้อมูลตาราง pnl_data:
