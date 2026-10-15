@@ -1,5 +1,5 @@
+import google.genai as genai
 import pandas as pd
-import google.generativeai as genai
 import sqlite3
 import streamlit as st
 
@@ -12,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Google Gemini)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Google Gemini 2.5)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -58,12 +58,13 @@ except Exception as e:
   st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูล: {e}")
   st.stop()
 
-# ตรวจสอบการตั้งค่า API Key (ใช้ GEMINI_API_KEY ใน Streamlit Secrets)
+# ตรวจสอบการตั้งค่า API Key
 if "GEMINI_API_KEY" not in st.secrets:
   st.error("❌ กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
   st.stop()
 
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# สร้าง Client ของ Google GenAI รุ่นใหม่
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ส่วนเลือกคำถามวิเคราะห์
 question = st.selectbox(
@@ -88,8 +89,11 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         """
 
     try:
-      model = genai.GenerativeModel("gemini-1.5-flash")
-      response = model.generate_content(prompt)
+      # ใช้โมเดลมาตรฐานรุ่นปัจจุบันผ่าน SDK ใหม่
+      response = client.models.generate_content(
+          model="gemini-2.5-flash",
+          contents=prompt,
+      )
       st.markdown("### 🤖 ผลการวิเคราะห์")
       st.info(response.text)
     except Exception as e:
