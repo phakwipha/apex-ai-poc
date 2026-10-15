@@ -12,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Gemini 2.5 Flash)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Gemini 3.8 Flash)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -66,7 +66,10 @@ if "GEMINI_API_KEY" not in st.secrets:
 # ตั้งค่าการใช้งาน Gemini API
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ช่องพิมพ์คำถามแชทแบบอิสระ
+# ล็อกชื่อรุ่นตามที่ API Error บังคับมา ห้ามเปลี่ยนเป็นชื่ออื่นอีกเด็ดขาด
+MODEL_NAME = "gemini-3.8-flash"
+
+# ส่วนช่องพิมพ์คำถามแชทแบบอิสระ
 st.markdown("### 💬 พูดคุยและสอบถามข้อมูลการเงินกับ AI")
 user_question = st.text_input(
     "พิมพ์คำถามหรือสิ่งที่คุณต้องการวิเคราะห์จากข้อมูลการเงิน:",
@@ -83,8 +86,7 @@ if analyze_btn:
   else:
     with st.spinner("กำลังประมวลผลคำตอบ..."):
       try:
-        # ใช้รุ่น gemini-2.5-flash ที่เป็นมาตรฐานปัจจุบัน
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel(MODEL_NAME)
         data_summary = df.to_string(index=False)
         prompt = f"""
                 คุณคือผู้ช่วยผู้บริหารด้านการเงิน วิเคราะห์ข้อมูล P&L ต่อไปนี้เพื่อตอบคำถามของผู้ใช้
