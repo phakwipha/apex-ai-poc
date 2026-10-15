@@ -1,3 +1,4 @@
+import google.generativeai as genai
 import pandas as pd
 import sqlite3
 import streamlit as st
@@ -11,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (AI Chatbot Assistant)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -57,54 +58,49 @@ except Exception as e:
   st.error(f"เกิดข้อผิดพลาดในการโหลดข้อมูล: {e}")
   st.stop()
 
-# ตรวจสอบการตั้งค่า API Key
+# ตรวจสอบการตั้งค่า API Key ใน Streamlit Secrets
 if "GEMINI_API_KEY" not in st.secrets:
   st.error("❌ กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
   st.stop()
 
-api_key = st.secrets["GEMINI_API_KEY"]
+# ตั้งค่าการใช้งาน Gemini API
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ส่วนเลือกคำถามวิเคราะห์
-question = st.selectbox(
-    "💡 เลือกคำถามวิเคราะห์ด่วน หรือพิมพ์คำถามของคุณ:",
-    [
-        "BU ไหนกำไรสูงสุด",
-        "ภาพรวมรายได้และกำไรสุทธิเทียบกับงบประมาณเป็นอย่างไร",
-        "หน่วยงานใดที่มีค่าใช้จ่ายหรือผลประกอบการน่ากังวล",
-    ],
+# ช่องพิมพ์คำถามแบบอิสระ (Chat Input / Text Input)
+st.markdown("### 💬 พูดคุยและสอบถามข้อมูลกับ AI")
+user_question = st.text_input(
+    "พิมพ์คำถามหรือสิ่งที่คุณต้องการวิเคราะห์จากข้อมูลการเงิน:",
+    placeholder="เช่น เปรียบเทียบรายได้ Retail BU กับ Online BU หรือ BU ไหนทำกำไรได้ดีที่สุด",
 )
 
-if st.button("วิเคราะห์ข้อมูลด้วย AI", type="primary"):
-  with st.spinner("กำลังวิเคราะห์ข้อมูลการเงิน..."):
-    analysis_result = None
+col1, col2 = st.columns([1, 5])
+with col1:
+  analyze_btn = st.button("ส่งคำถาม", type="primary")
 
-    # พยายามเรียกใช้งานผ่าน Google GenAI SDK ทางการ
-    try:
-      import google.generativeai as genai
+if analyze_btn:
+  if not user_question.strip():
+    st.warning("⚠️ กรุณากรอกคำถามที่ต้องการวิเคราะห์ก่อนครับ")
+  else:
+    with st.spinner("กำลังประมวลผลคำตอบ..."):
+      try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        data_summary = df.to_string(index=False)
+        prompt = f"""
+                คุณคือผู้ช่วยผู้บริหารด้านการเงิน วิเคราะห์ข้อมูล P&L ต่อไปนี้เพื่อตอบคำถามของผู้ใช้
+                
+                คำถามของผู้ใช้: "{user_question}"
+                
+                ข้อมูลตาราง pnl_data:
+                {data_summary}
+                
+                กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
+                """
 
-      genai.configure(api_key=api_key)
-      model = genai.GenerativeModel("gemini-3.5-flash")
-      prompt = f"""
-            คุณคือผู้ช่วยผู้บริหารด้านการเงิน วิเคราะห์ข้อมูล P&L ต่อไปนี้เพื่อตอบคำถาม: "{question}"
-            ข้อมูลตาราง pnl_data:
-            {df.to_string(index=False)}
-            กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
-            """
-      response = model.generate_content(prompt)
-      analysis_result = response.text
-    except Exception as api_err:
-      # กรณีที่ API Key ติดข้อจำกัดสิทธิ์หรือ Error ระบบจะแสดงผลการวิเคราะห์เชิงโครงสร้างสำรองทันทีเพื่อให้แดชบอร์ดไม่พัง
-      analysis_result = f"""
-      *(หมายเหตุ: ระบบตรวจพบข้อจำกัดสิทธิ์ของ API Key หรือการเชื่อมต่อภายนอก: {str(api_err)})*
-
-      **🤖 ผลการวิเคราะห์เบื้องต้นจากระบบสำรอง (Fallback Analysis):**
-      - **หน่วยงานที่มีกำไรสูงสุด:** Corporate BU เป็นหน่วยงานที่มีกำไรจากการดำเนินงาน (Operating Profit) สูงที่สุดในระบบ (820,000 ถึง 950,000 ในแต่ละไตรมาส)
-      - **ภาพรวมรายได้:** Corporate BU มีรายได้จริงสูงที่สุด รองลงมาคือ Retail BU และ Online BU ตามลำดับ
-      - **ข้อสังเกตสำหรับผู้บริหาร:** รายได้รวมของทุก BU ในช่วง Q1 และ Q2 มีแนวโน้มเติบโตขึ้น แต่บางหน่วยงาน (เช่น Corporate BU) มีรายได้จริงต่ำกว่างบประมาณเล็กน้อย ควรกำชับฝ่ายขายให้ช่วยกันผลักดันยอดช่วงครึ่งปีหลังให้เป็นไปตามเป้า
-      """
-
-    st.markdown("### 🤖 ผลการวิเคราะห์")
-    st.info(analysis_result)
+        response = model.generate_content(prompt)
+        st.markdown("### 🤖 ผลลัพธ์จากการวิเคราะห์")
+        st.info(response.text)
+      except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดในการประมวลผลจาก AI: {e}")
 
 # แสดงตารางข้อมูลเบื้องต้น
 with st.expander("📁 ดูข้อมูลดิบทั้งหมดในระบบ (Raw Data)"):
