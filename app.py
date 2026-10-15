@@ -13,7 +13,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude API Direct)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude API)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -88,7 +88,7 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
         """
 
-    # ยิงตรงเข้า Anthropic Messages API ด้วย HTTP POST (ไม่ต้องพึ่ง SDK)
+    # ใช้โมเดล Sonnet มาตรฐานที่รองรับทุกบัญชี API ทั่วไป
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -96,7 +96,7 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
     }
 
     payload = {
-        "model": "claude-3-5-haiku-20241022",
+        "model": "claude-3-5-sonnet-latest",
         "max_tokens": 400,
         "messages": [{"role": "user", "content": prompt}],
     }
@@ -114,9 +114,7 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         st.markdown("### 🤖 ผลการวิเคราะห์")
         st.info(ai_reply)
       else:
-        st.error(
-            f"API Error ({res.status_code}): {res.text}"
-        )  # จะปริ้นท์ Error ดิบที่แท้จริงออกมาให้เห็นชัดๆ
+        st.error(f"API Error ({res.status_code}): {res.text}")
     except Exception as e:
       st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อ: {e}")
 
