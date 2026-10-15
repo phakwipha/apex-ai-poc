@@ -1,76 +1,24 @@
-import sqlite3
 import anthropic
-import pandas as pd
 import streamlit as st
 
-# ดึง API Key ของ Anthropic
-if "ANTHROPIC_API_KEY" in st.secrets:
-    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+st.title("🧪 API Diagnostic Test")
+
+# เช็คว่ามี Key ใน Secrets ไหม
+if "ANTHROPIC_API_KEY" not in st.secrets:
+    st.error("❌ ไม่พบ ANTHROPIC_API_KEY ใน Streamlit Secrets")
 else:
-    st.error("กรุณาตั้งค่า ANTHROPIC_API_KEY ใน Streamlit Secrets")
+    api_key = st.secrets["ANTHROPIC_API_KEY"]
+    st.write(f"🔑 Key ที่ดึงได้: `{api_key[:8]}...{api_key[-4:]}`")
 
-
-def run_nl2sql(user_query):
-    schema_info = """
-    Table Name: financial_summary
-    Columns:
-    - Period (TEXT): e.g. '2026-08', '2026-09'
-    - BU_Name (TEXT): e.g. 'Core Banking', 'Digital Payment'
-    - Revenue_Actual (REAL)
-    - Revenue_Budget (REAL)
-    - Operating_Profit (REAL)
-    """
-
-    prompt = f"""
-    You are an expert SQLite Data Analyst. 
-    Based on the DB Schema below, generate ONLY a valid SQLite query to answer the user's question.
-    Do not include markdown syntax like ```sql or explanation. Output raw SQL query string only.
-    
-    Schema:
-    {schema_info}
-    
-    User Question: {user_query}
-    """
-
-    response = client.messages.create(
-        model="claude-3-haiku-20240307",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    # ดึงผลลัพธ์ที่เป็นข้อความ SQL
-    sql_query = (
-        response.content[0]
-        .text.strip()
-        .replace("```sql", "")
-        .replace("```", "")
-        .strip()
-    )
-
-    conn = sqlite3.connect("enterprise_poc.db")
-    df_result = pd.read_sql_query(sql_query, conn)
-    conn.close()
-
-    return sql_query, df_result
-
-
-# ---- Dashboard UI ----
-st.title("📊 Executive P&L & Financial Intelligence Dashboard")
-st.write("ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Claude 3.5 Haiku)")
-
-user_input = st.chat_input(
-    "พิมพ์คำถามเชิงธุรกิจ (เช่น 'ขอผลกำไรของ Core Banking เดือน 2026-08')"
-)
-
-if user_input:
-    st.chat_message("user").write(user_input)
-    with st.chat_message("assistant"):
-        try:
-            sql, result_df = run_nl2sql(user_input)
-            st.markdown(f"**Generated SQL:** `{sql}`")
-            if not result_df.empty:
-                st.dataframe(result_df)
-            else:
-                st.write("ไม่พบข้อมูลตามเงื่อนไขที่ระบุ")
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+    # ทดสอบยิง API ตรงๆ
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        res = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=10,
+            messages=[{"role": "user", "content": "hi"}],
+        )
+        st.success("✅ เชื่อมต่อสำเร็จ! API Key และ Model ใช้งานได้ปกติ")
+        st.write("Response จาก Claude:", res.content[0].text)
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาด: {e}")
