@@ -12,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Gemini 3.8 Flash)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (AI Chatbot)</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -65,26 +65,31 @@ if "GEMINI_API_KEY" not in st.secrets:
 
 # ตั้งค่าการใช้งาน Gemini API
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-
-# ล็อกชื่อรุ่นตามที่ API Error บังคับมา ห้ามเปลี่ยนเป็นชื่ออื่นอีกเด็ดขาด
 MODEL_NAME = "gemini-3.8-flash"
 
-# ส่วนช่องพิมพ์คำถามแชทแบบอิสระ
-st.markdown("### 💬 พูดคุยและสอบถามข้อมูลการเงินกับ AI")
-user_question = st.text_input(
-    "พิมพ์คำถามหรือสิ่งที่คุณต้องการวิเคราะห์จากข้อมูลการเงิน:",
-    placeholder="เช่น เปรียบเทียบรายได้ Retail BU กับ Online BU หรือ BU ไหนทำกำไรสูงสุด",
-)
+# เก็บประวัติการสนทนาใน session_state เพื่อให้แชทไม่หายไปไหน
+if "messages" not in st.session_state:
+  st.session_state.messages = []
 
-col1, col2 = st.columns([1, 5])
-with col1:
-  analyze_btn = st.button("ส่งคำถาม", type="primary")
+# แสดงประวัติการสนทนาเก่า
+for message in st.session_state.messages:
+  with st.chat_message(message["role"]):
+    st.markdown(message["content"])
 
-if analyze_btn:
-  if not user_question.strip():
-    st.warning("⚠️ กรุณากรอกคำถามที่ต้องการวิเคราะห์ก่อนครับ")
-  else:
-    with st.spinner("กำลังประมวลผลคำตอบ..."):
+# ช่องแชทบอทด้านล่างสุด (Chat Input แบบมาตรฐาน Streamlit)
+if user_question := st.chat_input(
+    "พิมพ์คำถามหรือสิ่งที่คุณต้องการวิเคราะห์จากข้อมูลการเงิน..."
+):
+  # แสดงคำถามของผู้ใช้ทันที
+  st.session_state.messages.append(
+      {"role": "user", "content": user_question}
+  )
+  with st.chat_message("user"):
+    st.markdown(user_question)
+
+  # ประมวลผลคำตอบจาก AI
+  with st.chat_message("assistant"):
+    with st.spinner("กำลังวิเคราะห์ข้อมูลการเงิน..."):
       try:
         model = genai.GenerativeModel(MODEL_NAME)
         data_summary = df.to_string(index=False)
@@ -100,11 +105,17 @@ if analyze_btn:
                 """
 
         response = model.generate_content(prompt)
-        st.markdown("### 🤖 ผลลัพธ์จากการวิเคราะห์")
-        st.info(response.text)
-      except Exception as e:
-        st.error(f"เกิดข้อผิดพลาดในการประมวลผลจาก AI: {e}")
+        ai_reply = response.text
+        st.markdown(ai_reply)
 
-# แสดงตารางข้อมูลเบื้องต้น
+        # บันทึกคำตอบของ AI ลงประวัติ
+        st.session_state.messages.append(
+            {"role": "assistant", "content": ai_reply}
+        )
+      except Exception as e:
+        error_msg = f"เกิดข้อผิดพลาดในการประมวลผลจาก AI: {e}"
+        st.error(error_msg)
+
+# แสดงตารางข้อมูลเบื้องต้นด้านล่างสุด
 with st.expander("📁 ดูข้อมูลดิบทั้งหมดในระบบ (Raw Data)"):
   st.dataframe(df, use_container_width=True)
