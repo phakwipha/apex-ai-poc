@@ -12,7 +12,7 @@ st.markdown(
     """
     <div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px;'>
         <h1 style='color: #1f2937; margin-bottom: 5px;'>📊 Executive P&L & Financial Intelligence Dashboard</h1>
-        <p style='color: #4b5563; font-size: 16px;'>ระบบรายงานผู้บริหารและผู้ช่วยวิเคราะห์ข้อมูลอัตโนมัติ (Powered by Google Gemini 2.5)</p>
+        <p style='color: #4b5563; font-size: 16px;'>ระบบตรวจสอบและค้นหาโมเดลที่รองรับใน API Key ของคุณอัตโนมัติ</p>
     </div>
 """,
     unsafe_allow_html=True,
@@ -63,10 +63,32 @@ if "GEMINI_API_KEY" not in st.secrets:
   st.error("❌ กรุณาตั้งค่า GEMINI_API_KEY ใน Streamlit Secrets ให้เรียบร้อย")
   st.stop()
 
-# สร้าง Client ของ Google GenAI รุ่นใหม่
+# สร้าง Client ของ Google GenAI
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ส่วนเลือกคำถามวิเคราะห์
+st.markdown("### 🔍 ตรวจสอบรายชื่อโมเดลที่บัญชีของคุณรองรับ")
+if st.button("ดึงรายชื่อโมเดลทั้งหมดที่ใช้ได้จริง", type="secondary"):
+  with st.spinner("กำลังดึงข้อมูลจากเซิร์ฟเวอร์..."):
+    try:
+      models_list = []
+      for m in client.models.list():
+        # กรองเอาเฉพาะรุ่นที่รองรับการสร้างข้อความ (generateContent)
+        if "generateContent" in m.supported_generation_methods:
+          models_list.append(m.name)
+
+      if models_list:
+        st.success(
+            "✅ ค้นพบโมเดลที่ API Key ของคุณมีสิทธิ์เรียกใช้งานได้จริงดังนี้:"
+        )
+        st.write(models_list)
+      else:
+        st.warning(
+            "⚠️ ไม่พบโมเดลที่รองรับ generateContent สำหรับคีย์นี้ กรุณาตรวจสอบสิทธิ์ของโปรเจกต์"
+        )
+    except Exception as e:
+      st.error(f"เกิดข้อผิดพลาดในการดึงรายการโมเดล: {e}")
+
+# ส่วนเลือกคำถามวิเคราะห์ (ใช้ชื่อรุ่นกลางๆ ที่มักเปิดให้ทุกบัญชีทดสอบ)
 question = st.selectbox(
     "💡 เลือกคำถามวิเคราะห์ด่วน หรือพิมพ์คำถามของคุณ:",
     [
@@ -88,16 +110,31 @@ if st.button("วิเคราะห์ข้อมูลด้วย AI", typ
         กรุณาตอบเป็นภาษาไทย กระชับ ชัดเจน และตรงไปตรงมาสำหรับผู้บริหาร
         """
 
-    try:
-      # ใช้โมเดลมาตรฐานรุ่นปัจจุบันผ่าน SDK ใหม่
-      response = client.models.generate_content(
-          model="gemini-2.5-flash",
-          contents=prompt,
-      )
+    # ลองใช้รุ่นมาตรฐานที่ปลอดภัยที่สุดก่อน
+    target_models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    success_response = None
+    last_error = None
+
+    for m_name in target_models:
+      try:
+        response = client.models.generate_content(
+            model=m_name,
+            contents=prompt,
+        )
+        success_response = response.text
+        break
+      except Exception as e:
+        last_error = e
+        continue
+
+    if success_response:
       st.markdown("### 🤖 ผลการวิเคราะห์")
-      st.info(response.text)
-    except Exception as e:
-      st.error(f"เกิดข้อผิดพลาดในการประมวลผล: {e}")
+      st.info(success_response)
+    else:
+      st.error(
+          f"เกิดข้อผิดพลาดในการประมวลผลทุกโมเดลหลัก: {str(last_error)}"
+          " (แนะนำให้กดปุ่ม 'ดึงรายชื่อโมเดลทั้งหมดที่ใช้ได้จริง' ด้านบนเพื่อเช็คชื่อรุ่นที่ถูกต้องของคีย์คุณครับ)"
+      )
 
 # แสดงตารางข้อมูลเบื้องต้น
 with st.expander("📁 ดูข้อมูลดิบทั้งหมดในระบบ (Raw Data)"):
